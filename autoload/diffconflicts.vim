@@ -6,12 +6,7 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 function! diffconflicts#hasConflicts() abort
-    try
-        silent execute "%s/^<<<<<<< //gn"
-        return 1
-    catch /Pattern not found/
-        return 0
-    endtry
+    return search('^<<<<<<<\s', 'nw') > 0
 endfunction
 
 function! diffconflicts#diffconfl() abort
@@ -20,7 +15,7 @@ function! diffconflicts#diffconfl() abort
 
     if g:diffconflicts_vcs ==# "git"
         " Obtain the git setting for the conflict style.
-        let l:conflictStyle = system("git config --get merge.conflictStyle")[:-2]
+        let l:conflictStyle = trim(system("git config --get merge.conflictStyle"))
     else
         " Assume 2way conflict style otherwise.
         let l:conflictStyle = "diff"
@@ -30,25 +25,36 @@ function! diffconflicts#diffconfl() abort
     rightb vsplit
     enew
     silent execute "read #" .. l:origBuf
-    1delete
-    silent execute "file RCONFL"
-    silent execute "set filetype=" .. l:origFt
+    1delete _
+    file RCONFL
+    let &l:filetype = l:origFt
     diffthis " set foldmethod before editing
-    silent execute "g/^<<<<<<< /,/^=======\\r\\?$/d"
-    silent execute "g/^>>>>>>> /d"
+    silent keepjumps keepmarks global /^<<<<<<< /,/^=======\r\?$/delete _
+    silent keepjumps keepmarks global /^>>>>>>> /delete _
     setlocal nomodifiable readonly buftype=nofile bufhidden=delete nobuflisted
 
     " Set up the left-hand side.
     wincmd p
     diffthis " set foldmethod before editing
     if l:conflictStyle ==? "diff3" || l:conflictStyle ==? "zdiff3"
-        silent execute "g/^||||||| \\?/,/^>>>>>>> /d"
+        silent keepjumps keepmarks global /^||||||| \?/,/^>>>>>>> /delete _
     else
-        silent execute "g/^=======\\r\\?$/,/^>>>>>>> /d"
+        silent keepjumps keepmarks global /^=======\r\?$/,/^>>>>>>> /delete _
     endif
-    silent execute "g/^<<<<<<< /d"
+    silent keepjumps keepmarks global /^<<<<<<< /delete _
 
     diffupdate
+endfunction
+
+function! s:setupBuffer(l:bufname, l:vcsAltname) abort
+    if g:diffconflicts_vcs ==# "hg"
+        execute "buffer" a:vcsAltname
+        execute "file" a:bufname
+    else
+        execute "buffer" a:bufname
+    endif
+    setlocal nomodifiable readonly
+    diffthis
 endfunction
 
 function! diffconflicts#showHistory() abort
@@ -56,40 +62,16 @@ function! diffconflicts#showHistory() abort
     tabnew
     vsplit
     vsplit
-    wincmd h
-    wincmd h
+    execute "normal! \<C-w>h\<C-w>h"
 
     " Populate each window.
-    if g:diffconflicts_vcs ==# "hg"
-        buffer ~local.
-        file LOCAL
-    else
-        buffer LOCAL
-    endif
-    setlocal nomodifiable readonly
-    diffthis
-
+    call s:setupBuffer("LOCAL", "~local.")
     wincmd l
-    if g:diffconflicts_vcs ==# "hg"
-        buffer ~base.
-        file BASE
-    else
-        buffer BASE
-    endif
-    setlocal nomodifiable readonly
-    diffthis
-
+    call s:setupBuffer("BASE", "~base.")
     wincmd l
-    if g:diffconflicts_vcs ==# "hg"
-        buffer ~other.
-        file OTHER
-    else
-        buffer REMOTE
-    endif
-    setlocal nomodifiable readonly
-    diffthis
+    call s:setupBuffer("REMOTE", "~other.")
 
-    " Put cursor in back in BASE.
+    " Put cursor back in BASE.
     wincmd h
 endfunction
 
@@ -111,7 +93,7 @@ function! diffconflicts#checkThenShowHistory() abort
                 \   l:filecheck
                 \ )
 
-    if (len(l:xs) < 3)
+    if len(l:xs) < 3
         echohl WarningMsg
                     \ | echo "Missing one or more of BASE, LOCAL, REMOTE."
                     \   .. " Was Vim invoked by a Git mergetool?"
@@ -124,7 +106,7 @@ function! diffconflicts#checkThenShowHistory() abort
 endfunction
 
 function! diffconflicts#checkThenDiff() abort
-    if (diffconflicts#hasConflicts())
+    if diffconflicts#hasConflicts()
         redraw
         echohl WarningMsg
                     \ | echon "Resolve conflicts leftward then save. Use :cq to abort."

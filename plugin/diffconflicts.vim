@@ -16,11 +16,11 @@ if !exists("g:diffconflicts_vcs")
     let g:diffconflicts_vcs = "git"
 endif
 
-command! DiffConflicts call diffconflicts#checkThenDiff()
-command! DiffConflictsShowHistory call diffconflicts#checkThenShowHistory()
-command! DiffConflictsWithHistory call diffconflicts#checkThenShowHistory()
-    \ | 1tabn
-    \ | call diffconflicts#checkThenDiff()
+command! -bar DiffConflicts call diffconflicts#checkThenDiff()
+command! -bar DiffConflictsShowHistory call diffconflicts#checkThenShowHistory()
+command! -bar DiffConflictsWithHistory call diffconflicts#checkThenShowHistory()
+            \ | 1tabn
+            \ | call diffconflicts#checkThenDiff()
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
