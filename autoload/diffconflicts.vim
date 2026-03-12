@@ -2,9 +2,6 @@
 " Maintainer: Seth House <seth@eseth.com>
 " License: MIT
 
-let s:save_cpo = &cpo
-set cpo&vim
-
 function! diffconflicts#hasConflicts() abort
     return search('^<<<<<<<\s', 'nw') > 0
 endfunction
@@ -46,7 +43,7 @@ function! diffconflicts#diffconfl() abort
     diffupdate
 endfunction
 
-function! s:setupBuffer(l:bufname, l:vcsAltname) abort
+function! s:setupBuffer(bufname, vcsAltname) abort
     if g:diffconflicts_vcs ==# "hg"
         execute "buffer" a:vcsAltname
         execute "file" a:bufname
@@ -81,17 +78,9 @@ function! diffconflicts#checkThenShowHistory() abort
     else
         let l:filecheck = 'v:val =~# "BASE" || v:val =~# "LOCAL" || v:val =~# "REMOTE"'
     endif
-    let l:xs =
-                \ filter(
-                \   map(
-                \     filter(
-                \       range(1, bufnr('$')),
-                \       'bufexists(v:val)'
-                \     ),
-                \     'bufname(v:val)'
-                \   ),
-                \   l:filecheck
-                \ )
+
+    let l:bufnames = map(filter(range(1, bufnr('$')), 'bufexists(v:val)'), 'bufname(v:val)')
+    let l:xs = filter(l:bufnames, l:filecheck)
 
     if len(l:xs) < 3
         echohl WarningMsg
@@ -116,6 +105,3 @@ function! diffconflicts#checkThenDiff() abort
         echohl WarningMsg | echo "No conflict markers found." | echohl None
     endif
 endfunction
-
-let &cpo = s:save_cpo
-unlet s:save_cpo
